@@ -1,0 +1,188 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Step Functions Example'
+Resources:
+  # Step functions state machine
+  StateMachineOnboardingInstall:
+    Type: 'AWS::StepFunctions::StateMachine'
+    Properties:
+      DefinitionString: !Sub |
+        {
+          "Comment": "AWS Step Functions Example",
+          "StartAt": "SendMessage1",
+          "Version": "1.0",
+          "States": {
+            "SendMessage1": {
+              "Type": "Task",
+              "Resource": "${FunctionSendMessage.Arn}",
+              "Retry": [{
+                "ErrorEquals": ["States.TaskFailed"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 16,
+                "BackoffRate": 2
+              }],
+              "Next": "Wait1"
+            },
+            "Wait1": {
+              "Type": "Wait",
+              "Seconds": 3,
+              "Next": "FetchActivityCount1"
+            },
+            "FetchActivityCount1": {
+              "Type": "Task",
+              "Resource": "${FunctionFetchActivityCount.Arn}",
+              "Retry": [{
+                "ErrorEquals": ["States.TaskFailed"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 16,
+                "BackoffRate": 2
+              }],
+              "Next": "CheckActivityCount1"
+            },
+            "CheckActivityCount1": {
+              "Type": "Choice",
+              "Choices": [{
+                "Variable": "$.activities",
+                "NumericEquals": 0,
+                "Next": "SendMessage2"
+              }],
+              "Default": "Done"
+            },
+            "SendMessage2": {
+              "Type": "Task",
+              "Resource": "${FunctionSendMessage.Arn}",
+              "Retry": [{
+                "ErrorEquals": ["States.TaskFailed"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 16,
+                "BackoffRate": 2
+              }],
+              "Next": "Wait2"
+            },
+            "Wait2": {
+              "Type": "Wait",
+              "Seconds": 3,
+              "Next": "FetchActivityCount2"
+            },
+            "FetchActivityCount2": {
+              "Type": "Task",
+              "Resource": "${FunctionFetchActivityCount.Arn}",
+              "Retry": [{
+                "ErrorEquals": ["States.TaskFailed"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 16,
+                "BackoffRate": 2
+              }],
+              "Next": "CheckActivityCount2"
+            },
+            "CheckActivityCount2": {
+              "Type": "Choice",
+              "Choices": [{
+                "Variable": "$.activities",
+                "NumericEquals": 0,
+                "Next": "SendMessage3"
+              }],
+              "Default": "Done"
+            },
+            "SendMessage3": {
+              "Type": "Task",
+              "Resource": "${FunctionSendMessage.Arn}",
+              "Retry": [{
+                "ErrorEquals": ["States.TaskFailed"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 16,
+                "BackoffRate": 2
+              }],
+              "Next": "Done"
+            },
+            "Done": {
+              "Type": "Succeed"
+            }
+          }
+        }
+      RoleArn: !GetAtt 'RoleOnboardingInstall.Arn'
+
+
+
+  # Lambda functions
+  FunctionSendMessage:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          'use strict'
+          module.exports.handler = (event, context, cb) => {
+            console.log(JSON.stringify(event));
+            if (Math.random() < 0.3) { // fail 30% of the time
+              cb(new Error('error happened'));
+            } else {
+              cb(null, {});
+            }
+          };
+      Handler: 'index.handler'
+      Role: !GetAtt 'RoleSendMessage.Arn'
+      Runtime: 'nodejs6.10'
+  FunctionFetchActivityCount:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |
+          'use strict'
+          module.exports.handler = (event, context, cb) => {
+            console.log(JSON.stringify(event));
+            if (Math.random() < 0.3) {
+              cb(new Error('error happened')); // fail 30% of the time
+            } else {
+              cb(null, {activities: Date.now() % 2}); // return zero 50% of the time
+            }
+          };
+      Handler: 'index.handler'
+      Role: !GetAtt 'RoleFetchActivityCount.Arn'
+      Runtime: 'nodejs6.10'
+
+
+
+  # IAM roles
+  RoleOnboardingInstall:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: !Sub 'states.${AWS::Region}.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      Policies:
+      - PolicyName: lambda
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: 'lambda:InvokeFunction'
+            Resource:
+            - !GetAtt 'FunctionSendMessage.Arn'
+            - !GetAtt 'FunctionFetchActivityCount.Arn'
+  RoleSendMessage:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: 'lambda.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+  RoleFetchActivityCount:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: 'lambda.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
