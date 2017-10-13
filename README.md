@@ -1,5 +1,7 @@
 # AWS Step Functions Example
 
+Find the blog post: https://cloudonaut.io/engaging-your-users-with-aws-step-functions/
+
 ## Installation
 
 ```
