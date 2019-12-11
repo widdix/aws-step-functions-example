@@ -105,7 +105,7 @@ Resources:
 
 
   # Lambda functions
-  FunctionSendMessage:
+  FunctionSendMessage: # no monitoring needed because function is invoked by StepFunctions
     Type: 'AWS::Lambda::Function'
     Properties:
       Code:
@@ -122,7 +122,7 @@ Resources:
       Handler: 'index.handler'
       Role: !GetAtt 'RoleSendMessage.Arn'
       Runtime: 'nodejs6.10'
-  FunctionFetchActivityCount:
+  FunctionFetchActivityCount: # no monitoring needed because function is invoked by StepFunctions
     Type: 'AWS::Lambda::Function'
     Properties:
       Code:
